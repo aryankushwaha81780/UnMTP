@@ -1,0 +1,12 @@
+# generated docs
+blueprint.html
+blueprint.pdf
+
+# python
+__pycache__/
+*.pyc
+
+# output dirs (default transfer destinations)
+transferred_files/
+transferred_files_fast/
+transferred_files_hybrid/

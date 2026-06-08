@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnMTP · Hybrid File Transfer System · Technical Blueprint</title>
+    <meta name="description" content="Technical blueprint for the UnMTP hybrid file transfer system.">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════ Design Tokens ═══════════ */
+        :root {
+            --bg: #f3f4f8;
+            --bg-white: #ffffff;
+            --bg-hover: #f8f9fc;
+            --border: #e5e7eb;
+            --border-light: #f0f1f5;
+            --text: #1e1e2d;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --primary: #4f46e5;
+            --primary-light: #eef2ff;
+            --primary-border: #c7d2fe;
+            --success: #10b981;
+            --success-light: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-light: #fffbeb;
+            --danger: #ef4444;
+            --danger-light: #fef2f2;
+            --info: #06b6d4;
+            --info-light: #ecfeff;
+            --violet: #8b5cf6;
+            --violet-light: #f5f3ff;
+            --orange: #f97316;
+            --orange-light: #fff7ed;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 6px;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -4px rgba(0,0,0,0.04);
+            --transition: 0.2s ease;
+        }
+
+        /* ═══════════ Reset ═══════════ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ═══════════ Top Navbar ═══════════ */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(12px);
+            background: rgba(255,255,255,0.92);
+        }
+        .topbar-inner {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            height: 60px;
+            gap: 32px;
+        }
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--text);
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .topbar-brand .brand-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: var(--radius-xs);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 800;
+        }
+        .topbar-nav {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            flex: 1;
+        }
+        .topbar-nav::-webkit-scrollbar { display: none; }
+        .topbar-nav a {
+            padding: 8px 14px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius-xs);
+            white-space: nowrap;
+            transition: all var(--transition);
+        }
+        .topbar-nav a:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+        .topbar-nav a.active {
+            color: var(--primary);
+            background: var(--primary-light);
+            font-weight: 600;
+        }
+        .topbar-tag {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            background: var(--success-light);
+            color: var(--success);
+            border-radius: 100px;
+            flex-shrink: 0;
+        }
+
+        /* ═══════════ Container ═══════════ */
+        .container {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        /* ═══════════ Hero / Page Header ═══════════ */
+        .page-header {
+            margin-bottom: 32px;
+        }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .breadcrumb span { color: var(--text-secondary); }
+        .page-title {
+            font-size: 1.65rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+        .page-desc {
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+            max-width: 680px;
+            line-height: 1.7;
+        }
+
+        /* ═══════════ Stat Cards Row ═══════════ */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 768px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        .stat-card {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 22px;
+            box-shadow: var(--shadow-sm);
+            transition: all var(--transition);
+        }
+        .stat-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+        .stat-card .stat-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+        .stat-card .stat-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .stat-card .stat-value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--text);
+            letter-spacing: -0.03em;
+        }
+        .stat-card .stat-change {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .stat-change.up { background: var(--success-light); color: var(--success); }
+        .stat-change.info { background: var(--info-light); color: var(--info); }
+        .stat-change.warn { background: var(--warning-light); color: var(--warning); }
+        .stat-change.violet { background: var(--violet-light); color: var(--violet); }
+
+        /* ═══════════ Card ═══════════ */
+        .card {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 24px;
+            overflow: hidden;
+            transition: box-shadow var(--transition);
+        }
+        .card:hover {
+            box-shadow: var(--shadow);
+        }
+        .card-head {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .card-head h3 {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .card-body {
+            padding: 24px;
+        }
+        .card-body p {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            line-height: 1.75;
+            margin-bottom: 14px;
+        }
+        .card-body p:last-child { margin-bottom: 0; }
+
+        /* ═══════════ Section ═══════════ */
+        .section {
+            margin-bottom: 40px;
+            scroll-margin-top: 80px;
+        }
+        .section-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .section-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .icon-primary  { background: var(--primary-light); color: var(--primary); }
+        .icon-success  { background: var(--success-light); color: var(--success); }
+        .icon-warning  { background: var(--warning-light); color: var(--warning); }
+        .icon-danger   { background: var(--danger-light); color: var(--danger); }
+        .icon-info     { background: var(--info-light); color: var(--info); }
+        .icon-violet   { background: var(--violet-light); color: var(--violet); }
+        .icon-orange   { background: var(--orange-light); color: var(--orange); }
+        .section-head h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .section-desc {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            line-height: 1.75;
+            margin-bottom: 20px;
+        }
+
+        /* ═══════════ Grid ═══════════ */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+
+        /* ═══════════ Badge / Tag ═══════════ */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        .badge-primary  { background: var(--primary-light); color: var(--primary); }
+        .badge-success  { background: var(--success-light); color: var(--success); }
+        .badge-warning  { background: var(--warning-light); color: var(--warning); }
+        .badge-danger   { background: var(--danger-light); color: var(--danger); }
+        .badge-info     { background: var(--info-light); color: var(--info); }
+        .badge-violet   { background: var(--violet-light); color: var(--violet); }
+        .badge-orange   { background: var(--orange-light); color: var(--orange); }
+
+        /* ═══════════ Tables ═══════════ */
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius-sm);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84rem;
+        }
+        thead th {
+            background: var(--bg);
+            text-align: left;
+            padding: 10px 16px;
+            font-weight: 600;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: var(--bg-hover); }
+
+        /* ═══════════ Code ═══════════ */
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        pre {
+            background: #1e1e2d;
+            color: #e5e7eb;
+            border-radius: var(--radius-sm);
+            padding: 18px 22px;
+            overflow-x: auto;
+            font-size: 0.82rem;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.7;
+            margin: 14px 0;
+        }
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        /* ═══════════ Protocol Blocks ═══════════ */
+        .proto-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 14px 0;
+        }
+        .proto-chip {
+            padding: 8px 14px;
+            border-radius: var(--radius-xs);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.76rem;
+            font-weight: 600;
+            text-align: center;
+            border: 1px solid;
+        }
+        .chip-flag { background: var(--danger-light); color: var(--danger); border-color: #fecaca; }
+        .chip-len  { background: var(--warning-light); color: var(--warning); border-color: #fde68a; }
+        .chip-path { background: var(--success-light); color: var(--success); border-color: #a7f3d0; }
+        .chip-size { background: var(--primary-light); color: var(--primary); border-color: var(--primary-border); }
+        .chip-data { background: var(--info-light); color: var(--info); border-color: #a5f3fc; }
+
+        /* ═══════════ File Tree ═══════════ */
+        .file-tree {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            line-height: 2;
+            padding: 20px 24px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-light);
+        }
+        .ft-dir  { color: var(--primary); font-weight: 600; }
+        .ft-file { color: var(--text-secondary); }
+        .ft-py   { color: var(--success); font-weight: 500; }
+        .ft-meta { color: var(--text-muted); font-size: 0.75em; }
+
+        /* ═══════════ Phase Blocks ═══════════ */
+        .phase-block {
+            border-left: 3px solid;
+            padding: 18px 22px;
+            background: var(--bg-white);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            margin-bottom: 14px;
+            border: 1px solid var(--border-light);
+        }
+        .phase-block.phase1 { border-left: 3px solid var(--info); }
+        .phase-block.phase2 { border-left: 3px solid var(--violet); }
+        .phase-block h4 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        .phase-block p {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* ═══════════ Function Cards ═══════════ */
+        .fn-item {
+            padding: 16px 20px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            margin-bottom: 10px;
+            transition: all var(--transition);
+            background: var(--bg-white);
+        }
+        .fn-item:hover {
+            border-color: var(--primary-border);
+            box-shadow: var(--shadow-sm);
+        }
+        .fn-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .fn-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .fn-loc {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        .fn-file {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+        .fn-desc {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+            margin-top: 6px;
+        }
+
+        /* ═══════════ List ═══════════ */
+        .clean-list {
+            list-style: none;
+            margin: 10px 0;
+        }
+        .clean-list li {
+            position: relative;
+            padding: 5px 0 5px 18px;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .clean-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 13px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary);
+            opacity: 0.4;
+        }
+
+        /* ═══════════ Mermaid ═══════════ */
+        .diagram-wrap {
+            padding: 24px;
+            overflow-x: auto;
+        }
+        .diagram-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 16px;
+        }
+
+        /* ═══════════ Mini Card (for grids) ═══════════ */
+        .mini-card {
+            padding: 18px 20px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            background: var(--bg-white);
+            transition: all var(--transition);
+        }
+        .mini-card:hover {
+            border-color: var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+        .mini-card h4 {
+            font-size: 0.84rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .mini-card p {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+        }
+
+        /* ═══════════ Footer ═══════════ */
+        .footer {
+            text-align: center;
+            padding: 32px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-light);
+            margin-top: 24px;
+        }
+
+        /* ═══════════ Scrollbar ═══════════ */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+        /* ═══════════ Responsive ═══════════ */
+        @media (max-width: 640px) {
+            .container { padding: 20px 16px; }
+            .topbar-inner { padding: 0 16px; }
+            .page-title { font-size: 1.3rem; }
+            .card-body { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════ TOP NAVBAR ═══════════ -->
+<header class="topbar">
+    <div class="topbar-inner">
+        <a href="#" class="topbar-brand">
+            <div class="brand-icon">TS</div>
+            UnMTP
+        </a>
+        <nav class="topbar-nav">
+            <a href="#overview" class="active">Overview</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#file-tree">Files</a>
+            <a href="#protocol">Protocol</a>
+            <a href="#data-flow">Data Flow</a>
+            <a href="#workflows">Workflows</a>
+            <a href="#sequence">Sequence</a>
+            <a href="#host-module">Host</a>
+            <a href="#pull-module">Pull</a>
+            <a href="#functions">Functions</a>
+            <a href="#dependencies">Deps</a>
+            <a href="#errors">Errors</a>
+            <a href="#security">Security</a>
+            <a href="#config">Config</a>
+        </nav>
+        <span class="topbar-tag">v1.0</span>
+    </div>
+</header>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<div class="container">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header" id="overview">
+        <div class="breadcrumb">
+            Projects <span>/</span> UnMTP <span>/</span> Blueprint
+        </div>
+        <h1 class="page-title">Hybrid File Transfer System</h1>
+        <p class="page-desc">
+            A two-phase, client-server file transfer tool built in Python. Combines
+            zero-copy kernel streaming for massive files (≥5 GB) with tar-pipe streaming
+            for everything else — designed for high-speed LAN transfers between Android/Termux and Windows.
+        </p>
+    </div>
+
+    <!-- STATS ROW -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Python Scripts</div>
+            <div class="stat-row">
+                <div class="stat-value">2</div>
+                <span class="stat-change info">Core</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Lines</div>
+            <div class="stat-row">
+                <div class="stat-value">399</div>
+                <span class="stat-change up">Lean</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Functions</div>
+            <div class="stat-row">
+                <div class="stat-value">7</div>
+                <span class="stat-change violet">Defined</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Transfer Phases</div>
+            <div class="stat-row">
+                <div class="stat-value">2</div>
+                <span class="stat-change warn">Hybrid</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════ -->
+    <!-- ARCHITECTURE                    -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="architecture">
+        <div class="section-head">
+            <div class="section-icon icon-primary">⬡</div>
+            <h2>Architecture & Internal Functionality</h2>
+        </div>
+        <p class="section-desc">
+            The system follows a client-server model using raw TCP sockets.
+            The host (server) runs on the source device (Android/Termux), recursively scans a target
+            folder, and the pull (client) runs on the destination machine (Windows PC). A custom binary
+            protocol with single-byte control flags orchestrates two distinct transfer phases.
+        </p>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>System Architecture Overview</h3>
+                <span class="badge badge-primary">Diagram</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+graph LR
+    subgraph HOST["🟢 HOST — Android / Termux"]
+        A["get_valid_target_folder()"]
+        B["hybrid_host()"]
+        C["File Scanner — os.walk()"]
+        D["Phase 1: Zero-Copy — sendfile()"]
+        E["Phase 2: Tar Pipe — tarfile w|"]
+    end
+    subgraph PULL["🔵 PULL — Windows PC"]
+        F["get_default_gateway_windows()"]
+        G["get_valid_destination_path()"]
+        H["hybrid_pull()"]
+        I["Phase 1 Receiver — Chunked Read"]
+        J["Phase 2 Receiver — tarfile r|"]
+    end
+    A --> B
+    B --> C
+    C --> D
+    C --> E
+    D -->|"TCP :5001 — 0x01"| I
+    E -->|"TCP :5001 — 0x02"| J
+    F --> H
+    G --> H
+    H --> I
+    H --> J
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="mini-card">
+                <h4><span class="badge badge-success">SERVER</span> hybrid-host.py</h4>
+                <p>
+                    Runs on the source device. Scans the target directory tree, identifies files exceeding the
+                    5 GB threshold, then serves the entire folder over a single TCP connection. Zero-copy
+                    kernel sendfile() is used for massive files, while the rest is streamed as a live tar archive.
+                </p>
+            </div>
+            <div class="mini-card">
+                <h4><span class="badge badge-primary">CLIENT</span> hybrid-pull.py</h4>
+                <p>
+                    Runs on the destination machine. Auto-detects the Wi-Fi gateway IP, connects to the host server,
+                    and listens for control flags. Receives big files individually, then extracts the tar stream
+                    for everything else. Includes a robust retry loop with user prompts.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- FILE TREE                       -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="file-tree">
+        <div class="section-head">
+            <div class="section-icon icon-info">⌸</div>
+            <h2>File & Directory Structure</h2>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="file-tree">
+                    <span class="ft-dir">UnMTP/</span><br>
+                    ├── <span class="ft-py">hybrid-host.py</span> <span class="ft-meta">— 145 lines · 6,087 bytes · Server/Host script</span><br>
+                    ├── <span class="ft-py">hybrid-pull.py</span> <span class="ft-meta">— 254 lines · 10,893 bytes · Client/Pull script</span><br>
+                    ├── <span class="ft-dir">__pycache__/</span> <span class="ft-meta">— Compiled bytecode (Python 3.14)</span><br>
+                    │&nbsp;&nbsp; ├── hybrid-host.cpython-314.pyc<br>
+                    │&nbsp;&nbsp; └── hybrid-pull.cpython-314.pyc<br>
+                    └── <span class="ft-dir">transferred_files_hybrid/</span> <span class="ft-meta">— Default destination (empty)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- WIRE PROTOCOL                   -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="protocol">
+        <div class="section-head">
+            <div class="section-icon icon-warning">⇄</div>
+            <h2>Wire Protocol Specification</h2>
+        </div>
+        <p class="section-desc">
+            All communication happens over a single persistent TCP connection on port <code>5001</code>.
+            The protocol is binary, big-endian, and uses single-byte control flags to delineate phases.
+        </p>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Phase 1 — Zero-Copy File Transfer</h3>
+                <span class="badge badge-info">Flag 0x01</span>
+            </div>
+            <div class="card-body">
+                <p>Repeated for each file ≥ 5 GB. Sent via <code>socket.sendfile()</code> for kernel-level zero-copy.</p>
+                <div class="proto-row">
+                    <div class="proto-chip chip-flag">0x01<br><small>Flag · 1B</small></div>
+                    <div class="proto-chip chip-len">Path Length<br><small>uint16 · 2B</small></div>
+                    <div class="proto-chip chip-path">Relative Path<br><small>UTF-8 · NB</small></div>
+                    <div class="proto-chip chip-size">File Size<br><small>uint64 · 8B</small></div>
+                    <div class="proto-chip chip-data">Raw File Data<br><small>filesize bytes</small></div>
+                </div>
+                <pre><code>struct.pack(f'!H{len(path)}sQ', path_len, path_bytes, filesize)</code></pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Phase 2 — Tar Stream</h3>
+                <span class="badge badge-violet">Flag 0x02</span>
+            </div>
+            <div class="card-body">
+                <p>Sent exactly once. A streaming tar archive containing all files below the threshold, preserving directory structure.</p>
+                <div class="proto-row">
+                    <div class="proto-chip chip-flag">0x02<br><small>Flag · 1B</small></div>
+                    <div class="proto-chip chip-data">Streaming Tar Archive<br><small>tarfile mode='w|'</small></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Connection Lifecycle</h3></div>
+            <div class="card-body">
+                <pre><code>TCP Handshake
+ ├─→ [0x01] + Header + FileData   (×N big files)
+ ├─→ [0x02] + Tar Stream          (×1 everything else)
+ └─→ Connection Close (EOF)</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- DATA FLOW                       -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="data-flow">
+        <div class="section-head">
+            <div class="section-icon icon-violet">⤳</div>
+            <h2>Data Flow & State Transitions</h2>
+        </div>
+        <p class="section-desc">
+            The transfer process is linear and stateful. Once Phase 1 big-file streaming completes,
+            the system transitions irreversibly to Phase 2 tar streaming. The client uses control
+            flags to determine which phase it's processing.
+        </p>
+        <div class="card">
+            <div class="card-head">
+                <h3>End-to-End Data Flow</h3>
+                <span class="badge badge-violet">Flowchart</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+flowchart TD
+    START(["▶ Host Starts"]) --> SCAN["Scan directory tree via os.walk()"]
+    SCAN --> CLASSIFY{"File ≥ 5 GB?"}
+    CLASSIFY -->|Yes| BIGLIST["Append to big_files list"]
+    CLASSIFY -->|No| SKIP["Included in tar stream later"]
+    BIGLIST --> BIND["Bind TCP socket on 0.0.0.0:5001"]
+    SKIP --> BIND
+    BIND --> LISTEN["Listen for connection"]
+    LISTEN --> ACCEPT["Accept client connection"]
+    ACCEPT --> P1_CHECK{"big_files empty?"}
+    P1_CHECK -->|No| P1_SEND["Send flag 0x01"]
+    P1_SEND --> P1_HEADER["Send header: path_len + path + filesize"]
+    P1_HEADER --> P1_DATA["sendfile — raw data"]
+    P1_DATA --> P1_NEXT{"More big files?"}
+    P1_NEXT -->|Yes| P1_SEND
+    P1_NEXT -->|No| P2_FLAG["Send flag 0x02"]
+    P1_CHECK -->|Yes| P2_FLAG
+    P2_FLAG --> P2_TAR["Create streaming tar — mode w|"]
+    P2_TAR --> P2_FILTER["tar.add with filter — Skip files ≥ 5 GB"]
+    P2_FILTER --> DONE(["✓ Transfer Complete"])
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- WORKFLOW DIAGRAMS               -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="workflows">
+        <div class="section-head">
+            <div class="section-icon icon-danger">⎔</div>
+            <h2>Heavy Workflow Diagrams</h2>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Host Startup & Transfer Workflow</h3>
+                <span class="badge badge-success">hybrid-host.py</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+flowchart TD
+    E1(["main"]) --> E2["get_valid_target_folder"]
+    E2 --> E3["Prompt user for folder path"]
+    E3 --> E4{"Path provided?"}
+    E4 -->|No| E5["Use default Termux storage path"]
+    E4 -->|Yes| E6{"Absolute path?"}
+    E5 --> E7
+    E6 -->|Yes| E7{"Path exists?"}
+    E6 -->|No| E8["Resolve relative to default_dir then CWD"]
+    E8 --> E7
+    E7 -->|No| E3
+    E7 -->|Yes| E9{"Is directory?"}
+    E9 -->|No| E3
+    E9 -->|Yes| E10{"Readable?"}
+    E10 -->|No| E3
+    E10 -->|Yes| E11["Return abs_path"]
+    E11 --> H1["hybrid_host — folder_path"]
+    H1 --> H2["Normalize base_dir"]
+    H2 --> H3["os.walk — Full recursive scan"]
+    H3 --> H4["Classify: size ≥ 5 GB → big_files"]
+    H4 --> H5["Create TCP socket — SO_SNDBUF 8 MB"]
+    H5 --> H6["Bind 0.0.0.0:5001"]
+    H6 --> H7["Listen + Accept"]
+    H7 --> PH1["PHASE 1 LOOP"]
+    PH1 --> PH1A{"big_files?"}
+    PH1A -->|"Next file"| PH1B["Send 0x01 flag"]
+    PH1B --> PH1C["Pack and send header"]
+    PH1C --> PH1D["sendfile — zero-copy"]
+    PH1D --> PH1A
+    PH1A -->|"Done"| PH2["PHASE 2"]
+    PH2 --> PH2A["Send 0x02 flag"]
+    PH2A --> PH2B["Create tar_filter callback"]
+    PH2B --> PH2C["conn.makefile wb"]
+    PH2C --> PH2D["tarfile.open mode w|"]
+    PH2D --> PH2E["tar.add with filter"]
+    PH2E --> PH2F["Close socket file"]
+    PH2F --> END(["✓ Transfer Done"])
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Client Connection & Receive Workflow</h3>
+                <span class="badge badge-primary">hybrid-pull.py</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+flowchart TD
+    M1(["main"]) --> M2["get_default_gateway_windows"]
+    M2 --> M3{"PowerShell Get-NetRoute?"}
+    M3 -->|Success| M4["Return gateway IP"]
+    M3 -->|Fail| M5["Parse ipconfig output"]
+    M5 --> M6{"Wi-Fi adapter found?"}
+    M6 -->|Yes| M7["Extract Default Gateway from Wi-Fi"]
+    M6 -->|No| M8["Fallback: any adapter with IPv4"]
+    M7 --> M9{"Valid IPv4?"}
+    M8 --> M9
+    M9 -->|Yes| M4
+    M9 -->|No| M10["Return None"]
+    M4 --> D1["get_valid_destination_path"]
+    M10 --> D1
+    D1 --> D2["Prompt user for destination"]
+    D2 --> D3{"Path provided?"}
+    D3 -->|No| D4["Use ./transferred_files_hybrid"]
+    D3 -->|Yes| D5["os.makedirs exist_ok"]
+    D4 --> D5
+    D5 --> D6{"Writable? test file check"}
+    D6 -->|No| D2
+    D6 -->|Yes| D7["Return abs_path"]
+    D7 --> CL["CONNECTION LOOP"]
+    CL --> CL1{"target_ip set?"}
+    CL1 -->|No| CL2["Prompt for IP"]
+    CL1 -->|Yes| CL3{"First attempt?"}
+    CL3 -->|Yes| CL4["Use detected IP"]
+    CL3 -->|No| CL5["Prompt with default"]
+    CL2 --> CL6["hybrid_pull"]
+    CL4 --> CL6
+    CL5 --> CL6
+    CL6 --> R1["Connect to host:5001 — RCVBUF 8 MB timeout 60s"]
+    R1 --> R2["makefile rb buffering 8MB"]
+    R2 --> R3["READ LOOP"]
+    R3 --> R4["Read 1-byte flag"]
+    R4 --> R5{"Flag value?"}
+    R5 -->|"0x01"| R6["Read header: path_len + path + filesize"]
+    R6 --> R9["Create parent dirs"]
+    R9 --> R10["Write file in 1MB chunks"]
+    R10 --> R3
+    R5 -->|"0x02"| R11["tarfile.open mode r|"]
+    R11 --> R12["tar.extractall"]
+    R12 --> DONE(["✓ Complete"])
+    R5 -->|"EOF"| DONE
+    CL6 -->|"ConnectionRefused"| CL7["Reset IP — retry"]
+    CL7 --> CL
+    CL6 -->|"ConnectionReset"| CL8["Ask user retry?"]
+    CL8 -->|"y"| CL
+    CL8 -->|"n"| EXIT(["Exit"])
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SEQUENCE DIAGRAMS               -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="sequence">
+        <div class="section-head">
+            <div class="section-icon icon-orange">↕</div>
+            <h2>Runtime Sequence Diagrams</h2>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Complete Transfer Session</h3>
+                <span class="badge badge-orange">Sequence</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant H as hybrid-host.py
+    participant FS as File System
+    participant NET as TCP :5001
+    participant P as hybrid-pull.py
+    participant WFS as Windows FS
+
+    U->>H: python hybrid-host.py
+    H->>U: Prompt for folder path
+    U->>H: /data/.../storage/
+    H->>FS: os.walk(folder_path)
+    FS-->>H: File list with sizes
+    H->>H: Classify files ≥5GB → big_files
+    H->>NET: bind + listen
+    H->>U: Server ready...
+
+    U->>P: python hybrid-pull.py
+    P->>P: get_default_gateway_windows()
+    P->>U: Detected gateway: x.x.x.x
+    P->>U: Prompt for destination
+    U->>P: ./transferred_files_hybrid
+
+    P->>NET: connect(host_ip:5001)
+    NET-->>H: Connection accepted
+
+    rect rgba(6, 182, 212, 0.08)
+        Note over H,P: PHASE 1 — Zero-Copy Streaming
+        loop Each file ≥ 5GB
+            H->>NET: 0x01 flag
+            H->>NET: Header + sendfile raw bytes
+            NET-->>P: Read flag + parse header
+            P->>WFS: Write in 1MB chunks
+        end
+    end
+
+    rect rgba(139, 92, 246, 0.08)
+        Note over H,P: PHASE 2 — Tar Pipe Streaming
+        H->>NET: 0x02 flag
+        H->>NET: Streaming tar archive
+        NET-->>P: tarfile.open r|
+        P->>WFS: extractall()
+    end
+
+    H->>NET: Close connection
+    H->>U: Done!
+    P->>U: Done!
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Gateway Auto-Detection</h3>
+                <span class="badge badge-warning">Sequence</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+sequenceDiagram
+    participant P as hybrid-pull.py
+    participant PS as PowerShell
+    participant IC as ipconfig
+
+    P->>PS: Get-NetRoute DestinationPrefix 0.0.0.0/0
+    alt PowerShell succeeds
+        PS-->>P: NextHop IP
+        P->>P: Validate IPv4 regex
+        P-->>P: Return IP
+    else PowerShell fails
+        P->>IC: ipconfig
+        IC-->>P: Full adapter output
+        P->>P: Parse Wi-Fi adapter section
+        alt Wi-Fi found
+            P->>P: Extract Default Gateway
+        else No Wi-Fi
+            P->>P: Find any adapter with IPv4
+        end
+        P->>P: Filter with IPv4 regex
+        P-->>P: Return IP or None
+    end
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- HOST MODULE                     -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="host-module">
+        <div class="section-head">
+            <div class="section-icon icon-success">⬢</div>
+            <h2>Host Module Deep Dive</h2>
+        </div>
+        <p class="section-desc">
+            <code>hybrid-host.py</code> runs on the source device (Android/Termux).
+            It implements a single-client TCP server with a two-phase transfer pipeline.
+        </p>
+
+        <div class="phase-block phase1">
+            <h4>Phase 1 — Zero-Copy Kernel Transfer</h4>
+            <p>
+                Files ≥ 5 GB are sent individually using <code>socket.sendfile()</code>, which leverages
+                the OS kernel's <code>sendfile(2)</code> syscall to transfer data directly from file descriptor
+                to socket — without copying through userspace. This dramatically reduces CPU usage and memory pressure
+                for multi-gigabyte files.
+            </p>
+        </div>
+
+        <div class="phase-block phase2">
+            <h4>Phase 2 — Streaming Tar Archive</h4>
+            <p>
+                All remaining files plus the full directory structure are bundled into a streaming
+                tar archive (<code>mode='w|'</code>). A custom <code>tar_filter()</code> excludes
+                files already transferred in Phase 1. The tar is written directly to the socket's file wrapper
+                with no intermediate disk I/O.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Key Design Decisions</h3></div>
+            <div class="card-body">
+                <ul class="clean-list">
+                    <li>Send buffer set to 8 MB (<code>SO_SNDBUF = 8388608</code>) for sustained throughput</li>
+                    <li>5 GB threshold balances tar overhead vs. zero-copy benefits</li>
+                    <li>Relative paths computed from <code>os.path.dirname(base_dir)</code> — preserving root folder name</li>
+                    <li>Single connection model — no multiplexing or parallel streams</li>
+                    <li><code>SO_REUSEADDR</code> enabled for fast server restart without TIME_WAIT issues</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- PULL MODULE                     -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="pull-module">
+        <div class="section-head">
+            <div class="section-icon icon-primary">⬡</div>
+            <h2>Pull Module Deep Dive</h2>
+        </div>
+        <p class="section-desc">
+            <code>hybrid-pull.py</code> runs on the destination Windows machine — the more complex script,
+            featuring auto network discovery, validated input, a connection retry loop, and dual-phase receive logic.
+        </p>
+
+        <div class="grid-2">
+            <div class="mini-card">
+                <h4><span class="badge badge-warning">NET</span> Gateway Auto-Detection</h4>
+                <p>
+                    Two-tier strategy: primary uses PowerShell <code>Get-NetRoute</code> with 3s timeout.
+                    Fallback parses <code>ipconfig</code> output prioritizing Wi-Fi, then any adapter with IPv4.
+                    All candidates validated against strict IPv4 regex.
+                </p>
+            </div>
+            <div class="mini-card">
+                <h4><span class="badge badge-info">I/O</span> Destination Validation</h4>
+                <p>
+                    Creates directory tree via <code>os.makedirs</code>, tests writability by creating and
+                    deleting a temp file (<code>.write_test_temp</code>), loops until valid writable path or
+                    user cancels.
+                </p>
+            </div>
+            <div class="mini-card">
+                <h4><span class="badge badge-danger">LOOP</span> Connection Retry Logic</h4>
+                <p>
+                    ConnectionRefused/Timeout: resets IP, re-prompts. ConnectionReset/Aborted: asks user y/n.
+                    KeyboardInterrupt: graceful exit. First attempt uses auto-detected IP; retries prompt with previous default.
+                </p>
+            </div>
+            <div class="mini-card">
+                <h4><span class="badge badge-success">BUF</span> Buffer Configuration</h4>
+                <p>
+                    Socket receive buffer: 8 MB. Python file-object buffering: 8 MB.
+                    Phase 1 write chunks: 1 MB. Socket timeout: 60 seconds.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- FUNCTION INDEX                  -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="functions">
+        <div class="section-head">
+            <div class="section-icon icon-success">ƒ</div>
+            <h2>Complete Function Index</h2>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>hybrid-host.py</h3>
+                <span class="badge badge-success">Server</span>
+            </div>
+            <div class="card-body" style="padding:12px;">
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">get_valid_target_folder()</span>
+                        <span class="fn-loc">L11–L51</span>
+                    </div>
+                    <div class="fn-desc">
+                        Interactive prompt loop that validates the source folder path. Resolves relative paths first against
+                        the default Termux storage directory, then against CWD. Verifies existence, directory status, and read permissions.
+                    </div>
+                </div>
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">hybrid_host(folder_path, port=5001)</span>
+                        <span class="fn-loc">L55–L141</span>
+                    </div>
+                    <div class="fn-desc">
+                        Core server function. Scans target directory for big files, binds TCP socket, accepts a single client,
+                        and executes the two-phase transfer pipeline. Phase 1 iterates <code>big_files[]</code> with
+                        <code>sendfile()</code>. Phase 2 creates a filtered streaming tar.
+                    </div>
+                </div>
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">tar_filter(tarinfo)</span>
+                        <span class="fn-loc">L118–L125</span>
+                    </div>
+                    <div class="fn-file">Nested closure inside hybrid_host()</div>
+                    <div class="fn-desc">
+                        Callback for <code>tar.add()</code>. Reconstructs full path from tar member name, checks size
+                        against threshold, returns <code>None</code> to exclude already-transferred big files.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>hybrid-pull.py</h3>
+                <span class="badge badge-primary">Client</span>
+            </div>
+            <div class="card-body" style="padding:12px;">
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">get_default_gateway_windows()</span>
+                        <span class="fn-loc">L10–L98</span>
+                    </div>
+                    <div class="fn-desc">
+                        Two-tier Windows gateway IP auto-detection. Primary method uses PowerShell <code>Get-NetRoute</code> with
+                        3s timeout. Fallback parses raw <code>ipconfig</code> output, prioritizing Wi-Fi adapter section.
+                        Returns first valid IP or <code>None</code>.
+                    </div>
+                </div>
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">get_valid_destination_path()</span>
+                        <span class="fn-loc">L100–L132</span>
+                    </div>
+                    <div class="fn-desc">
+                        Validates and creates destination directory. Tests writability via temp file create/delete cycle.
+                        Default: <code>./transferred_files_hybrid</code>.
+                    </div>
+                </div>
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">hybrid_pull(target_ip, output_dir, port=5001)</span>
+                        <span class="fn-loc">L134–L204</span>
+                    </div>
+                    <div class="fn-desc">
+                        Core client function. Connects to host, creates buffered file object, enters receive loop.
+                        Reads 1-byte control flags to dispatch between Phase 1 (chunked binary write) and Phase 2 (tar extraction).
+                    </div>
+                </div>
+                <div class="fn-item">
+                    <div class="fn-top">
+                        <span class="fn-name">__main__ block</span>
+                        <span class="fn-loc">L206–L254</span>
+                    </div>
+                    <div class="fn-desc">
+                        Orchestration entry point. Calls gateway detection, destination validation, then enters connection retry loop.
+                        Manages first-attempt vs. retry IP prompting logic with typed exception handlers.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- DEPENDENCIES                    -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="dependencies">
+        <div class="section-head">
+            <div class="section-icon icon-info">⊞</div>
+            <h2>Dependencies & Import Mapping</h2>
+        </div>
+        <p class="section-desc">
+            Both scripts use <strong>only Python standard library modules</strong> — zero external dependencies.
+            No <code>requirements.txt</code> or <code>pip install</code> needed.
+        </p>
+
+        <div class="card">
+            <div class="card-head">
+                <h3>Module Import Graph</h3>
+                <span class="badge badge-info">Diagram</span>
+            </div>
+            <div class="diagram-wrap">
+                <div class="mermaid">
+graph TD
+    subgraph HOST["hybrid-host.py"]
+        H_socket["socket"]
+        H_os["os"]
+        H_struct["struct"]
+        H_time["time"]
+        H_tarfile["tarfile"]
+        H_sys["sys"]
+    end
+    subgraph PULL["hybrid-pull.py"]
+        P_socket["socket"]
+        P_os["os"]
+        P_struct["struct"]
+        P_tarfile["tarfile"]
+        P_time["time"]
+        P_subprocess["subprocess"]
+        P_re["re"]
+        P_sys["sys"]
+    end
+    subgraph STDLIB["Python Standard Library"]
+        S1["socket"]
+        S2["os"]
+        S3["struct"]
+        S4["time"]
+        S5["tarfile"]
+        S6["sys"]
+        S7["subprocess"]
+        S8["re"]
+    end
+    H_socket --> S1
+    H_os --> S2
+    H_struct --> S3
+    H_time --> S4
+    H_tarfile --> S5
+    H_sys --> S6
+    P_socket --> S1
+    P_os --> S2
+    P_struct --> S3
+    P_tarfile --> S5
+    P_time --> S4
+    P_subprocess --> S7
+    P_re --> S8
+    P_sys --> S6
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><h3>Module Usage Reference</h3></div>
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Module</th><th>Used In</th><th>Purpose</th><th>Key APIs</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>socket</code></td>
+                                <td><span class="badge badge-success">HOST</span> <span class="badge badge-primary">PULL</span></td>
+                                <td>TCP/IP networking</td>
+                                <td>socket(), bind(), listen(), accept(), connect(), sendfile(), makefile()</td>
+                            </tr>
+                            <tr>
+                                <td><code>os</code></td>
+                                <td><span class="badge badge-success">HOST</span> <span class="badge badge-primary">PULL</span></td>
+                                <td>Path ops, dir walking</td>
+                                <td>os.walk(), os.path.*, os.getsize(), os.makedirs()</td>
+                            </tr>
+                            <tr>
+                                <td><code>struct</code></td>
+                                <td><span class="badge badge-success">HOST</span> <span class="badge badge-primary">PULL</span></td>
+                                <td>Binary header packing</td>
+                                <td>struct.pack(), struct.unpack()</td>
+                            </tr>
+                            <tr>
+                                <td><code>tarfile</code></td>
+                                <td><span class="badge badge-success">HOST</span> <span class="badge badge-primary">PULL</span></td>
+                                <td>Streaming tar archives</td>
+                                <td>tarfile.open(mode='w|'), tarfile.open(mode='r|')</td>
+                            </tr>
+                            <tr>
+                                <td><code>subprocess</code></td>
+                                <td><span class="badge badge-primary">PULL</span></td>
+                                <td>Shell command execution</td>
+                                <td>subprocess.run() for PowerShell and ipconfig</td>
+                            </tr>
+                            <tr>
+                                <td><code>re</code></td>
+                                <td><span class="badge badge-primary">PULL</span></td>
+                                <td>IP validation</td>
+                                <td>re.match() with IPv4 pattern</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="mini-card">
+            <h4><span class="badge badge-danger">NOTE</span> Inter-Script Relationship</h4>
+            <p>
+                The two scripts are <strong>completely independent</strong> — they don't import each other and share
+                no module. They communicate exclusively over TCP at runtime. The only contract between them
+                is the wire protocol: control flags, header format, and tar streaming mode.
+                Either can be reimplemented in any language.
+            </p>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- ERROR HANDLING                  -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="errors">
+        <div class="section-head">
+            <div class="section-icon icon-warning">⚠</div>
+            <h2>Error Handling Matrix</h2>
+        </div>
+
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Exception</th><th>Where</th><th>Trigger</th><th>Response</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>KeyboardInterrupt</code></td>
+                                <td>Both</td>
+                                <td>Ctrl+C</td>
+                                <td>Graceful exit</td>
+                            </tr>
+                            <tr>
+                                <td><code>PermissionError</code></td>
+                                <td>Both (path validation)</td>
+                                <td>Read/write access denied</td>
+                                <td>Re-prompt for new path</td>
+                            </tr>
+                            <tr>
+                                <td><code>OSError</code></td>
+                                <td>Host (bind)</td>
+                                <td>Port 5001 already in use</td>
+                                <td>Print error, return</td>
+                            </tr>
+                            <tr>
+                                <td><code>ConnectionRefusedError</code></td>
+                                <td>Pull (connect)</td>
+                                <td>Server not running</td>
+                                <td>Reset IP, loop to re-prompt</td>
+                            </tr>
+                            <tr>
+                                <td><code>socket.timeout</code></td>
+                                <td>Pull</td>
+                                <td>60s inactivity</td>
+                                <td>Connection error, retry prompt</td>
+                            </tr>
+                            <tr>
+                                <td><code>ConnectionResetError</code></td>
+                                <td>Both</td>
+                                <td>Network failure mid-transfer</td>
+                                <td>Host: logs. Pull: asks retry</td>
+                            </tr>
+                            <tr>
+                                <td><code>ConnectionAbortedError</code></td>
+                                <td>Pull (Phase 1)</td>
+                                <td>Stream ends before expected bytes</td>
+                                <td>Raised, propagates to retry loop</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SECURITY                        -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="security">
+        <div class="section-head">
+            <div class="section-icon icon-danger">⛨</div>
+            <h2>Security & Limitations</h2>
+        </div>
+
+        <div class="grid-3">
+            <div class="mini-card">
+                <h4>⚠️ No Encryption</h4>
+                <p>Raw bytes over unencrypted TCP. Suitable for trusted LANs only.</p>
+            </div>
+            <div class="mini-card">
+                <h4>⚠️ No Authentication</h4>
+                <p>Server accepts any incoming connection without credentials.</p>
+            </div>
+            <div class="mini-card">
+                <h4>⚠️ Single Client</h4>
+                <p>listen(1) — accepts exactly one connection. No concurrency.</p>
+            </div>
+            <div class="mini-card">
+                <h4>⚠️ Tar Traversal</h4>
+                <p>extractall() without filter in older Python could allow path traversal.</p>
+            </div>
+            <div class="mini-card">
+                <h4>✅ LAN Design</h4>
+                <p>Explicitly designed for local Wi-Fi. Gateway detection and Termux paths reflect this.</p>
+            </div>
+            <div class="mini-card">
+                <h4>✅ Zero Dependencies</h4>
+                <p>No third-party packages — no supply-chain risk. Pure stdlib.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ════════════════════════════════ -->
+    <!-- CONFIGURATION                   -->
+    <!-- ════════════════════════════════ -->
+    <section class="section" id="config">
+        <div class="section-head">
+            <div class="section-icon icon-violet">⚙</div>
+            <h2>Configuration Constants</h2>
+        </div>
+
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Constant</th><th>Value</th><th>File</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>BIG_FILE_THRESHOLD</code></td>
+                                <td>5 × 1024³ (5 GB)</td>
+                                <td>hybrid-host.py</td>
+                                <td>Files ≥ this use zero-copy; below goes through tar</td>
+                            </tr>
+                            <tr>
+                                <td><code>port</code></td>
+                                <td>5001</td>
+                                <td>Both</td>
+                                <td>TCP port for the transfer server</td>
+                            </tr>
+                            <tr>
+                                <td><code>SO_SNDBUF</code></td>
+                                <td>8,388,608 (8 MB)</td>
+                                <td>hybrid-host.py</td>
+                                <td>Kernel send buffer size</td>
+                            </tr>
+                            <tr>
+                                <td><code>SO_RCVBUF</code></td>
+                                <td>8,388,608 (8 MB)</td>
+                                <td>hybrid-pull.py</td>
+                                <td>Kernel receive buffer size</td>
+                            </tr>
+                            <tr>
+                                <td><code>buffering</code></td>
+                                <td>8,388,608 (8 MB)</td>
+                                <td>hybrid-pull.py</td>
+                                <td>Socket file-object buffering</td>
+                            </tr>
+                            <tr>
+                                <td><code>buffer_size</code></td>
+                                <td>1,048,576 (1 MB)</td>
+                                <td>hybrid-pull.py</td>
+                                <td>Phase 1 write chunk size</td>
+                            </tr>
+                            <tr>
+                                <td>timeout</td>
+                                <td>60.0s</td>
+                                <td>hybrid-pull.py</td>
+                                <td>Socket inactivity timeout</td>
+                            </tr>
+                            <tr>
+                                <td>Default host path</td>
+                                <td>/data/data/com.termux/files/home/storage/</td>
+                                <td>hybrid-host.py</td>
+                                <td>Default source folder on Android/Termux</td>
+                            </tr>
+                            <tr>
+                                <td>Default pull path</td>
+                                <td>./transferred_files_hybrid</td>
+                                <td>hybrid-pull.py</td>
+                                <td>Default destination folder on Windows</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        Generated by Antigravity · Technical Blueprint v1.0 · June 2026
+    </div>
+
+</div>
+
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'default',
+        themeVariables: {
+            primaryColor: '#eef2ff',
+            primaryBorderColor: '#c7d2fe',
+            primaryTextColor: '#1e1e2d',
+            lineColor: '#9ca3af',
+            textColor: '#1e1e2d',
+            mainBkg: '#eef2ff',
+            nodeBorder: '#c7d2fe',
+            clusterBkg: '#f8f9fc',
+            clusterBorder: '#e5e7eb',
+            titleColor: '#1e1e2d',
+            edgeLabelBackground: '#ffffff',
+            actorBkg: '#eef2ff',
+            actorBorder: '#c7d2fe',
+            actorTextColor: '#1e1e2d',
+            signalColor: '#1e1e2d',
+            signalTextColor: '#1e1e2d',
+            noteBkgColor: '#fffbeb',
+            noteBorderColor: '#fde68a',
+            noteTextColor: '#1e1e2d',
+            activationBkgColor: '#eef2ff',
+            activationBorderColor: '#c7d2fe',
+            loopTextColor: '#4f46e5',
+            labelBoxBkgColor: '#f8f9fc',
+            labelBoxBorderColor: '#e5e7eb',
+            labelTextColor: '#1e1e2d',
+        },
+        flowchart: { curve: 'basis', padding: 16, useMaxWidth: true },
+        sequence: { useMaxWidth: true, boxMargin: 8, noteMargin: 10, messageMargin: 35, mirrorActors: true },
+        fontFamily: 'Inter, sans-serif',
+        fontSize: 13,
+    });
+
+    // Scrollspy for navbar
+    const sections = document.querySelectorAll('.section, .page-header');
+    const navLinks = document.querySelectorAll('.topbar-nav a');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(l => l.classList.remove('active'));
+                const active = document.querySelector(`.topbar-nav a[href="#${entry.target.id}"]`);
+                if (active) active.classList.add('active');
+            }
+        });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
