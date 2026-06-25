@@ -187,22 +187,46 @@ All configuration is done through constants at the top of each script. No config
 
 ### 1. Start the server on your Android phone (Termux)
 
-1. Run the Host Script: 
-  ```bash
-  python hybrid-host.py
-  ```
-2. You'll be prompted for the folder to share.
-3. Press **Enter** for the default, or type a path like `downloads/files`. The server will start and wait.
+```bash
+python hybrid-host.py
+```
+
+You'll be prompted for the folder to share:
+
+```
+Enter target folder path to host [Default: /data/data/com.termux/files/home/storage/]: 
+```
+
+Press **Enter** for the default, or type a path like `shared/movies`. The server will start and wait:
+
+```
+Hybrid Server Active. Found "x" files matching the Zero-Copy threshold.
+Waiting for PC to connect...
+```
 
 ### 2. Start the client on your Windows PC
 
-1. Run the Client Script: 
-  ```bash
-  python hybrid-pull.py
-  ```
-2. The script auto-detects your gateway IP and asks for a destination.
-3. Press **Enter** and it connects to the server automatically. The transfer begins:
+```bash
+python hybrid-pull.py
+```
 
+The script auto-detects your gateway IP and asks for a destination:
+
+```
+Auto-detected Default Gateway IP (Wi-Fi): 192.168.1.1
+Enter destination path [Default: ./transferred_files_hybrid]:
+```
+
+Press **Enter** and it connects to the server automatically. The transfer begins:
+
+```
+Connecting to Hybrid Server at 192.168.1.1:5001...
+Connected to Hybrid Server! Analyzing stream structure...
+[Receiving Phase 1] Extracting Big File: storage/movies/ubuntu.iso ("x" GB)
+[Receiving Phase 2] Catching remaining folder structure and small files...
+
+[Success] Hybrid extraction complete! Total execution time: "x" seconds.
+```
 
 ### 3. Output & Performance Benchmarks
 
@@ -230,10 +254,8 @@ We chose these exact test cases to validate different aspects of our network pip
 
 ##### Output Screenshots
 * **Host (Android Termux):**
-
   ![Test Case 1 Android Host](Testing/test_case_1/host_output_1.png)
 * **Client (Windows PowerShell):**
-
   ![Test Case 1 Windows Client](Testing/test_case_1/client_output_1.png)
 
 ##### Performance & Speed Logic Summary
@@ -255,10 +277,8 @@ We chose these exact test cases to validate different aspects of our network pip
 
 ##### Output Screenshots
 * **Host (Android Termux):**
-
   ![Test Case 2 Android Host](Testing/test_case_2/host_output_2.png)
 * **Client (Windows PowerShell):**
-
   ![Test Case 2 Windows Client](Testing/test_case_2/client_output_2.png)
 
 ##### Performance & Speed Logic Summary
@@ -280,10 +300,8 @@ We chose these exact test cases to validate different aspects of our network pip
 
 ##### Output Screenshots
 * **Host (Android Termux):**
-
   ![Test Case 3 Android Host](Testing/test_case_3/host_output_3.png)
 * **Client (Windows PowerShell):**
-
   ![Test Case 3 Windows Client](Testing/test_case_3/client_output_3.png)
 
 ##### Performance & Speed Logic Summary
@@ -296,7 +314,7 @@ We chose these exact test cases to validate different aspects of our network pip
   * **Speed Difference:**
     * **Why Client Average is Higher:** The Host calculates average speed from only 3 samples: one for each of the two Phase 1 zero-copy files, and one for the entire Phase 2 Tar streaming phase. The low speed of the Tar phase (~`16.78 MB/s`) drags the host average down to `35.00 MB/s` (representing a simple math average: `(sample1 + sample2 + sample3)/3`), giving the tiny files disproportionate weight. The Client, however, collects samples every 8MB throughout the 36.21 GB zero-copy phase (thousands of samples) plus 1 sample at the end of the tar phase. The high-speed zero-copy samples dominate the client's calculations, resulting in a more representative weighted average speed of `44.94 MB/s`.
     * **Peak & Lowest Variations:** The client logs a Peak of `56.13 MB/s` during zero-copy network bursts and a Lowest of `14.35 MB/s` during small-file disk write phases.
-
+> Just so you know, in some cases I've reached a maximum speed of 1488 MB/s (11.625 Gb/s).
 ---
 
 ## 🤝 Contributing
