@@ -6,7 +6,6 @@ import time
 import subprocess
 import re
 import sys
-import os
 
 def get_default_gateway_windows():
     # try powershell first, it's faster
@@ -248,7 +247,6 @@ if __name__ == "__main__":
     destination_path = get_valid_destination_path()
 
     port = 5001
-    target_ip = detected_ip
     first_attempt = True
     
     while True:
