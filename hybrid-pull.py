@@ -6,6 +6,7 @@ import time
 import subprocess
 import re
 import sys
+import os
 
 def get_default_gateway_windows():
     # try powershell first, it's faster
@@ -232,11 +233,17 @@ def hybrid_pull(target_ip, output_dir, port=5001):
             print(f"  Peak: {peak:.2f} MB/s | Lowest: {lowest:.2f} MB/s | Avg: {avg:.2f} MB/s")
 
 if __name__ == "__main__":
-    detected_ip = get_default_gateway_windows()
-    if detected_ip:
-        print(f"Detected gateway: {detected_ip}")
+    print("\n--- UnMTP Hybrid Pull Client ---")
+    
+    # 1. OS-Aware Gateway Detection
+    if os.name == 'nt':
+        print("Windows detected. Attempting to auto-detect Hotspot gateway...")
+        target_ip = get_default_gateway_windows()
+        if target_ip:
+            print(f"Auto-detected Gateway IP: {target_ip}")
     else:
-        print("Couldn't auto-detect gateway IP.")
+        print("Android/Linux detected. Skipping Windows network auto-detection.")
+        target_ip = None  # Forcing this to None triggers your existing manual input prompt
 
     destination_path = get_valid_destination_path()
 

@@ -4,9 +4,19 @@ import struct
 import time
 import tarfile
 import sys
+import os
 
 # anything above this goes through sendfile() instead of tar
 BIG_FILE_THRESHOLD = 5 * 1024 * 1024 * 1024 
+
+def get_valid_target_folder():
+    # Detect the operating system
+    if os.name == 'nt':
+        default_dir = os.path.abspath(os.getcwd())
+        print(f"Windows detected. Default directory set to: {default_dir}")
+    else:
+        default_dir = "/data/data/com.termux/files/home/storage/"
+        print(f"Android/Termux detected. Default directory set to: {default_dir}")
 
 def get_valid_target_folder():
     default_dir = "/data/data/com.termux/files/home/storage/"
