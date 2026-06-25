@@ -11,7 +11,7 @@ BIG_FILE_THRESHOLD = 5 * 1024 * 1024 * 1024
 def get_valid_target_folder():
     # pick the right default based on OS
     if os.name == 'nt':
-        default_dir = os.path.abspath(os.getcwd())
+        default_dir = os.path.expanduser("~")
         print(f"Windows detected. Default directory set to: {default_dir}")
     else:
         default_dir = "/data/data/com.termux/files/home/storage/"
