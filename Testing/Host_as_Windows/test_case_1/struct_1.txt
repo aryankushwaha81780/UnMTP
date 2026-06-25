@@ -1,0 +1,2 @@
+test_case_1/
+└── large-movie.mkv (16,106,127,360 bytes | 15.00 GB)

@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE_DIR="$HOME/storage/downloads/files"
+BASE_DIR="$HOME/storage/downloads/test_cases"
 
 echo "➔ Step 1: Creating directory structures..."
 mkdir -p "$BASE_DIR/test_case_1"

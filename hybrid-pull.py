@@ -105,7 +105,7 @@ def get_valid_destination_path():
             if not path_input:
                 path_input = default_dir
             
-            abs_path = os.path.abspath(path_input)
+            abs_path = os.path.abspath(os.path.expanduser(path_input))
             
             try:
                 os.makedirs(abs_path, exist_ok=True)

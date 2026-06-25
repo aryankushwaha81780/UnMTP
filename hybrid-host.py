@@ -22,6 +22,9 @@ def get_valid_target_folder():
             if not folder_input:
                 folder_input = default_dir
 
+            # expand ~ to home dir (shell does this automatically, python doesn't)
+            folder_input = os.path.expanduser(folder_input)
+
             # try resolving relative to default_dir first, then cwd
             if not os.path.isabs(folder_input):
                 path_relative_to_default = os.path.normpath(os.path.join(default_dir, folder_input))
