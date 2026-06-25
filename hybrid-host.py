@@ -102,7 +102,7 @@ def hybrid_host(folder_path, port=5001):
         try:
             # phase 1 — blast big files with sendfile()
             for filepath in big_files:
-                rel_path = os.path.relpath(filepath, os.path.dirname(base_dir))
+                rel_path = os.path.relpath(filepath, os.path.dirname(base_dir)).replace('\\', '/')
                 filesize = os.path.getsize(filepath)
                 
                 conn.sendall(b'\x01')

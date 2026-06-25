@@ -159,7 +159,7 @@ def hybrid_pull(target_ip, output_dir, port=5001):
                 rel_path_data = sock_file.read(path_len)
                 if not rel_path_data:
                     break
-                rel_path = rel_path_data.decode('utf-8')
+                rel_path = rel_path_data.decode('utf-8').replace('\\', '/')
                 
                 filesize_data = sock_file.read(8)
                 if not filesize_data:
