@@ -618,7 +618,8 @@
         <p class="page-desc">
             A two-phase, client-server file transfer tool built in Python. Combines
             zero-copy kernel streaming for massive files (≥5 GB) with tar-pipe streaming
-            for everything else — designed for high-speed LAN transfers between Android/Termux and Windows.
+            for everything else. Updated with OS fingerprinting to run fully bi-directionally
+            and cross-platform (Windows ↔ Android, Windows ↔ Windows, Android ↔ Android) over a local Hotspot/LAN.
         </p>
     </div>
 
@@ -664,9 +665,9 @@
         </div>
         <p class="section-desc">
             The system follows a client-server model using raw TCP sockets.
-            The host (server) runs on the source device (Android/Termux), recursively scans a target
-            folder, and the pull (client) runs on the destination machine (Windows PC). A custom binary
-            protocol with single-byte control flags orchestrates two distinct transfer phases.
+            The host (server) runs on the source device, and the pull (client) runs on the destination machine.
+            Both scripts are fully cross-platform (Windows or Android), dynamically adapting to the host and target OS.
+            A custom binary protocol with single-byte control flags orchestrates two distinct transfer phases.
         </p>
 
         <div class="card">
@@ -677,15 +678,15 @@
             <div class="diagram-wrap">
                 <div class="mermaid">
 graph LR
-    subgraph HOST["🟢 HOST — Android / Termux"]
+    subgraph HOST["🟢 HOST — OS-Aware Server (Android or Windows)"]
         A["get_valid_target_folder()"]
         B["hybrid_host()"]
         C["File Scanner — os.walk()"]
         D["Phase 1: Zero-Copy — sendfile()"]
         E["Phase 2: Tar Pipe — tarfile w|"]
     end
-    subgraph PULL["🔵 PULL — Windows PC"]
-        F["get_default_gateway_windows()"]
+    subgraph PULL["🔵 PULL — OS-Aware Client (Android or Windows)"]
+        F["get_default_gateway_windows() (if Win)"]
         G["get_valid_destination_path()"]
         H["hybrid_pull()"]
         I["Phase 1 Receiver — Chunked Read"]
@@ -709,17 +710,18 @@ graph LR
             <div class="mini-card">
                 <h4><span class="badge badge-success">SERVER</span> hybrid-host.py</h4>
                 <p>
-                    Runs on the source device. Scans the target directory tree, identifies files exceeding the
+                    Runs on the source device (Android or Windows). Scans the target directory tree, identifies files exceeding the
                     5 GB threshold, then serves the entire folder over a single TCP connection. Zero-copy
                     kernel sendfile() is used for massive files, while the rest is streamed as a live tar archive.
+                    Default host directories are assigned dynamically based on OS fingerprinting.
                 </p>
             </div>
             <div class="mini-card">
                 <h4><span class="badge badge-primary">CLIENT</span> hybrid-pull.py</h4>
                 <p>
-                    Runs on the destination machine. Auto-detects the Wi-Fi gateway IP, connects to the host server,
-                    and listens for control flags. Receives big files individually, then extracts the tar stream
-                    for everything else. Includes a robust retry loop with user prompts.
+                    Runs on the destination machine (Windows or Android). Fingerprints the host OS to conditionally perform
+                    gateway IP auto-discovery (via PowerShell on Windows), falling back to user input on Android/Linux. Receives
+                    big files individually, then extracts the tar stream for everything else.
                 </p>
             </div>
         </div>
@@ -868,9 +870,13 @@ flowchart TD
                 <div class="mermaid">
 flowchart TD
     E1(["main"]) --> E2["get_valid_target_folder"]
-    E2 --> E3["Prompt user for folder path"]
-    E3 --> E4{"Path provided?"}
-    E4 -->|No| E5["Use default Termux storage path"]
+    E2 --> E2B{"os.name?"}
+    E2B -->|"nt (Windows)"| E2C["default_dir = CWD"]
+    E2B -->|"posix (Android)"| E2D["default_dir = /data/.../storage/"]
+    E2C --> E3
+    E2D --> E3
+    E3["Prompt user for folder path"] --> E4{"Path provided?"}
+    E4 -->|No| E5["Use default_dir"]
     E4 -->|Yes| E6{"Absolute path?"}
     E5 --> E7
     E6 -->|Yes| E7{"Path exists?"}
@@ -915,7 +921,9 @@ flowchart TD
             <div class="diagram-wrap">
                 <div class="mermaid">
 flowchart TD
-    M1(["main"]) --> M2["get_default_gateway_windows"]
+    M1(["main"]) --> M1B{"os.name?"}
+    M1B -->|"nt (Windows)"| M2["get_default_gateway_windows"]
+    M1B -->|"posix (Android)"| M2B["Skip auto-detection"]
     M2 --> M3{"PowerShell Get-NetRoute?"}
     M3 -->|Success| M4["Return gateway IP"]
     M3 -->|Fail| M5["Parse ipconfig output"]
@@ -928,6 +936,7 @@ flowchart TD
     M9 -->|No| M10["Return None"]
     M4 --> D1["get_valid_destination_path"]
     M10 --> D1
+    M2B --> D1
     D1 --> D2["Prompt user for destination"]
     D2 --> D3{"Path provided?"}
     D3 -->|No| D4["Use ./transferred_files_hybrid"]
@@ -990,11 +999,17 @@ sequenceDiagram
     participant FS as File System
     participant NET as TCP :5001
     participant P as hybrid-pull.py
-    participant WFS as Windows FS
+    participant DFS as Dest FS
 
     U->>H: python hybrid-host.py
-    H->>U: Prompt for folder path
-    U->>H: /data/.../storage/
+    alt Host on Android
+        H->>H: os.name = posix
+        H->>U: Default: /data/.../storage/
+    else Host on Windows
+        H->>H: os.name = nt
+        H->>U: Default: C:\Users\...
+    end
+    U->>H: Select folder path
     H->>FS: os.walk(folder_path)
     FS-->>H: File list with sizes
     H->>H: Classify files ≥5GB → big_files
@@ -1002,10 +1017,17 @@ sequenceDiagram
     H->>U: Server ready...
 
     U->>P: python hybrid-pull.py
-    P->>P: get_default_gateway_windows()
-    P->>U: Detected gateway: x.x.x.x
+    alt Pull on Windows
+        P->>P: os.name = nt
+        P->>P: get_default_gateway_windows()
+        P->>U: Detected gateway: x.x.x.x
+    else Pull on Android
+        P->>P: os.name = posix
+        P->>U: Skipping auto-detection
+        U->>P: Enter server IP manually
+    end
     P->>U: Prompt for destination
-    U->>P: ./transferred_files_hybrid
+    U->>P: Select destination path
 
     P->>NET: connect(host_ip:5001)
     NET-->>H: Connection accepted
@@ -1016,7 +1038,7 @@ sequenceDiagram
             H->>NET: 0x01 flag
             H->>NET: Header + sendfile raw bytes
             NET-->>P: Read flag + parse header
-            P->>WFS: Write in 1MB chunks
+            P->>DFS: Write in 1MB chunks
         end
     end
 
@@ -1025,7 +1047,7 @@ sequenceDiagram
         H->>NET: 0x02 flag
         H->>NET: Streaming tar archive
         NET-->>P: tarfile.open r|
-        P->>WFS: extractall()
+        P->>DFS: extractall()
     end
 
     H->>NET: Close connection
@@ -1078,7 +1100,7 @@ sequenceDiagram
             <h2>Host Module Deep Dive</h2>
         </div>
         <p class="section-desc">
-            <code>hybrid-host.py</code> runs on the source device (Android/Termux).
+            <code>hybrid-host.py</code> runs on the source device (Android or Windows).
             It implements a single-client TCP server with a two-phase transfer pipeline.
         </p>
 
@@ -1106,6 +1128,7 @@ sequenceDiagram
             <div class="card-head"><h3>Key Design Decisions</h3></div>
             <div class="card-body">
                 <ul class="clean-list">
+                    <li><strong>Dynamic Path Defaults:</strong> Assigns default folders based on `os.name` (`~` on Windows, Termux home storage on Android).</li>
                     <li>Send buffer set to 8 MB (<code>SO_SNDBUF = 8388608</code>) for sustained throughput</li>
                     <li>5 GB threshold balances tar overhead vs. zero-copy benefits</li>
                     <li>Relative paths computed from <code>os.path.dirname(base_dir)</code> — preserving root folder name</li>
@@ -1125,17 +1148,15 @@ sequenceDiagram
             <h2>Pull Module Deep Dive</h2>
         </div>
         <p class="section-desc">
-            <code>hybrid-pull.py</code> runs on the destination Windows machine — the more complex script,
-            featuring auto network discovery, validated input, a connection retry loop, and dual-phase receive logic.
+            <code>hybrid-pull.py</code> runs on the destination machine (Windows or Android) — the more complex script,
+            featuring conditional network discovery, validated input, a connection retry loop, and dual-phase receive logic.
         </p>
 
         <div class="grid-2">
             <div class="mini-card">
                 <h4><span class="badge badge-warning">NET</span> Gateway Auto-Detection</h4>
                 <p>
-                    Two-tier strategy: primary uses PowerShell <code>Get-NetRoute</code> with 3s timeout.
-                    Fallback parses <code>ipconfig</code> output prioritizing Wi-Fi, then any adapter with IPv4.
-                    All candidates validated against strict IPv4 regex.
+                    OS-Conditional Execution: Runs two-tier auto-detection on Windows (PowerShell <code>Get-NetRoute</code> or <code>ipconfig</code>). On Android/Linux, it bypasses these platform-specific commands, sets target IP to <code>None</code>, and gracefully prompts the user to manually enter the Host IP.
                 </p>
             </div>
             <div class="mini-card">
@@ -1181,17 +1202,16 @@ sequenceDiagram
                 <div class="fn-item">
                     <div class="fn-top">
                         <span class="fn-name">get_valid_target_folder()</span>
-                        <span class="fn-loc">L11–L51</span>
+                        <span class="fn-loc">L11–L62</span>
                     </div>
                     <div class="fn-desc">
-                        Interactive prompt loop that validates the source folder path. Resolves relative paths first against
-                        the default Termux storage directory, then against CWD. Verifies existence, directory status, and read permissions.
+                        Interactive prompt loop that validates the source folder path. Detects host OS and assigns dynamic default directories (User Home on Windows, Termux Home on Android). Resolves relative paths first against the OS-specific default directory, then against CWD. Natively expands tilde (~) paths. Verifies existence, directory status, and read permissions.
                     </div>
                 </div>
                 <div class="fn-item">
                     <div class="fn-top">
                         <span class="fn-name">hybrid_host(folder_path, port=5001)</span>
-                        <span class="fn-loc">L55–L141</span>
+                        <span class="fn-loc">L63–L175</span>
                     </div>
                     <div class="fn-desc">
                         Core server function. Scans target directory for big files, binds TCP socket, accepts a single client,
@@ -1202,7 +1222,7 @@ sequenceDiagram
                 <div class="fn-item">
                     <div class="fn-top">
                         <span class="fn-name">tar_filter(tarinfo)</span>
-                        <span class="fn-loc">L118–L125</span>
+                        <span class="fn-loc">L128–L135</span>
                     </div>
                     <div class="fn-file">Nested closure inside hybrid_host()</div>
                     <div class="fn-desc">
@@ -1243,7 +1263,7 @@ sequenceDiagram
                 <div class="fn-item">
                     <div class="fn-top">
                         <span class="fn-name">hybrid_pull(target_ip, output_dir, port=5001)</span>
-                        <span class="fn-loc">L134–L204</span>
+                        <span class="fn-loc">L133–L233</span>
                     </div>
                     <div class="fn-desc">
                         Core client function. Connects to host, creates buffered file object, enters receive loop.
@@ -1253,11 +1273,10 @@ sequenceDiagram
                 <div class="fn-item">
                     <div class="fn-top">
                         <span class="fn-name">__main__ block</span>
-                        <span class="fn-loc">L206–L254</span>
+                        <span class="fn-loc">L234–L284</span>
                     </div>
                     <div class="fn-desc">
-                        Orchestration entry point. Calls gateway detection, destination validation, then enters connection retry loop.
-                        Manages first-attempt vs. retry IP prompting logic with typed exception handlers.
+                        Orchestration entry point. Detects client OS. On Windows, initiates PowerShell/ipconfig gateway IP auto-detection. On Android/Linux, bypasses auto-detection and sets target IP to None (prompting manual user input). Calls destination validation (resolving tilde ~ paths), and enters the connection retry loop.
                     </div>
                 </div>
             </div>
@@ -1557,15 +1576,15 @@ graph TD
                             </tr>
                             <tr>
                                 <td>Default host path</td>
-                                <td>/data/data/com.termux/files/home/storage/</td>
+                                <td>Dynamic (OS-aware)</td>
                                 <td>hybrid-host.py</td>
-                                <td>Default source folder on Android/Termux</td>
+                                <td>Default source directory (User Home on Windows, Termux Home on Android)</td>
                             </tr>
                             <tr>
                                 <td>Default pull path</td>
                                 <td>./transferred_files_hybrid</td>
                                 <td>hybrid-pull.py</td>
-                                <td>Default destination folder on Windows</td>
+                                <td>Default destination directory (Supports home directory ~ expansion)</td>
                             </tr>
                         </tbody>
                     </table>
